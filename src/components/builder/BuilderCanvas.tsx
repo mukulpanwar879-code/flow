@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useEffect, useRef } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -12,11 +12,15 @@ import {
   useNodesState,
   ConnectionMode,
   MarkerType,
+  applyNodeChanges,
+  applyEdgeChanges,
   type Node,
   type Edge,
   type Connection,
   type NodeMouseHandler,
   type EdgeMouseHandler,
+  type NodeChange,
+  type EdgeChange,
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -31,10 +35,7 @@ const markerLookup = {
   arrowclosed: MarkerType.ArrowClosed,
 } as const;
 
-// React Flow's built-in edge types: "default" (bezier), "straight", "step",
-// "smoothstep", "simplebezier". We map our "orthogonal" to "step" (with rounded
-// corners via style) since React Flow doesn't ship a true orthogonal router,
-// but step + smoothstep gives clean professional connectors.
+// Map our edge type names -> React Flow's built-in edge type names.
 function rfEdgeType(type: string): string {
   switch (type) {
     case "orthogonal":
@@ -57,12 +58,14 @@ function CanvasInner() {
   const selectNode = useDiagramStore((s) => s.selectNode);
   const selectEdge = useDiagramStore((s) => s.selectEdge);
   const updateNodePosition = useDiagramStore((s) => s.updateNodePosition);
+  const updateNodeData = useDiagramStore((s) => s.updateNodeData);
   const addEdgeToStore = useDiagramStore((s) => s.addEdge);
+  const deleteNode = useDiagramStore((s) => s.deleteNode);
+  const deleteEdge = useDiagramStore((s) => s.deleteEdge);
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId);
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId);
 
-  // Map store nodes -> React Flow nodes
-  // Order matters: non-interactive containers (swimlane, group) first so they render behind blocks.
+  // ============ Build RF nodes/edges from the store ============
   const rfNodes: Node[] = useMemo(() => {
     const ordered = [...project.nodes].sort((a, b) => {
       const order = (t: string) => (t === "swimlane" ? 0 : t === "group" ? 1 : t === "timeline" ? 2 : 3);
@@ -76,8 +79,6 @@ function CanvasInner() {
         data: n.data as any,
         selected: n.id === selectedNodeId,
       };
-      // Set explicit width/height so NodeResizer has known starting dimensions
-      // and so React Flow doesn't auto-measure (which would fight the store).
       const data: any = n.data;
       if (data?.width != null) (base as any).width = data.width;
       if (data?.height != null) (base as any).height = data.height;
@@ -126,7 +127,12 @@ function CanvasInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
 
-  // Sync RF local state when the store changes
+  // ============ One-way store → RF sync ============
+  // We track the last store signature we synced from. When the store changes
+  // (add/delete/undo/redo/import), we overwrite RF local state. This is safe
+  // because we ALSO propagate deletions back to the store via onNodesChange
+  // below — so by the time the store sig changes, RF local state already
+  // matches (and the sync is a no-op visually).
   const storeSig = useMemo(
     () => JSON.stringify(project.nodes) + "|" + JSON.stringify(project.edges),
     [project.nodes, project.edges]
@@ -140,28 +146,72 @@ function CanvasInner() {
     }
   }, [storeSig, rfNodes, rfEdges, setNodes, setEdges]);
 
+  // ============ Node changes ============
+  // Critical: propagate "remove" changes back to the store, and dimensions/
+  // position updates too. This is what stops deleted nodes from reappearing
+  // when the next store change triggers the sync effect above.
+  const handleNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      // Apply to local RF state first (keeps UI snappy)
+      setNodes((nds) => applyNodeChanges(changes, nds));
+
+      // Then propagate to the store
+      changes.forEach((change) => {
+        if (change.type === "remove") {
+          deleteNode(change.id);
+        } else if (change.type === "position" && change.position) {
+          // Live position updates during drag — only commit on dragStop to avoid spam
+          // (onNodeDragStop handles final commit)
+        } else if (change.type === "dimensions" && change.dimensions) {
+          // NodeResizer updates — find the node and persist new width/height
+          const node = project.nodes.find((n) => n.id === change.id);
+          if (node) {
+            const data: any = node.data;
+            const newWidth = change.dimensions.width;
+            const newHeight = change.dimensions.height;
+            if (newWidth && Math.abs(newWidth - (data.width ?? 0)) > 0.5) {
+              updateNodeData(change.id, { width: newWidth });
+            }
+            if (newHeight && Math.abs(newHeight - (data.height ?? 0)) > 0.5) {
+              updateNodeData(change.id, { height: newHeight });
+            }
+          }
+        }
+      });
+    },
+    [setNodes, deleteNode, updateNodeData, project.nodes]
+  );
+
+  const handleEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+      changes.forEach((change) => {
+        if (change.type === "remove") {
+          deleteEdge(change.id);
+        }
+      });
+    },
+    [setEdges, deleteEdge]
+  );
+
+  // ============ Connect (drag from handle to handle) ============
   const onConnect = useCallback(
     (conn: Connection) => {
-      addEdgeToStore(conn.source!, conn.target!);
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...conn,
-            id: `edge_${uuidv4().slice(0, 8)}`,
-            type: "step",
-            style: { stroke: defaultEdgeStyle.stroke, strokeWidth: defaultEdgeStyle.strokeWidth },
-            markerEnd: MarkerType.ArrowClosed,
-          },
-          eds
-        )
-      );
+      // Add to the store — the sync effect will pick it up and push to RF
+      addEdgeToStore(conn.source!, conn.target!, {
+        sourceHandle: conn.sourceHandle ?? undefined,
+        targetHandle: conn.targetHandle ?? undefined,
+      });
     },
-    [addEdgeToStore, setEdges]
+    [addEdgeToStore]
   );
 
   const onNodeClick: NodeMouseHandler = useCallback((_, node) => selectNode(node.id), [selectNode]);
   const onEdgeClick: EdgeMouseHandler = useCallback((_, edge) => selectEdge(edge.id), [selectEdge]);
-  const onNodeDragStop: NodeMouseHandler = useCallback((_, node) => updateNodePosition(node.id, node.position), [updateNodePosition]);
+  const onNodeDragStop: NodeMouseHandler = useCallback(
+    (_, node) => updateNodePosition(node.id, node.position),
+    [updateNodePosition]
+  );
   const onPaneClick = useCallback(() => {
     selectNode(null);
     selectEdge(null);
@@ -172,8 +222,8 @@ function CanvasInner() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
@@ -187,7 +237,11 @@ function CanvasInner() {
         proOptions={{ hideAttribution: true }}
         snapToGrid={project.canvas.snapToGrid}
         snapGrid={[project.canvas.gridSize, project.canvas.gridSize]}
-        defaultEdgeOptions={{ type: "step", markerEnd: MarkerType.ArrowClosed }}
+        defaultEdgeOptions={{
+          type: "step",
+          markerEnd: MarkerType.ArrowClosed,
+          style: { stroke: defaultEdgeStyle.stroke, strokeWidth: defaultEdgeStyle.strokeWidth },
+        }}
         minZoom={0.1}
         maxZoom={2}
       >

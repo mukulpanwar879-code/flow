@@ -118,10 +118,28 @@ function DiagramBlockNodeImpl({ data, selected, id }: NodeProps) {
         </div>
       )}
 
-      <Handle type="target" position={Position.Top} className="!w-2.5 !h-2.5 !bg-slate-400 !border-2 !border-white" />
-      <Handle type="source" position={Position.Bottom} className="!w-2.5 !h-2.5 !bg-slate-400 !border-2 !border-white" />
-      <Handle type="target" position={Position.Left} id="left" className="!w-2.5 !h-2.5 !bg-slate-400 !border-2 !border-white" />
-      <Handle type="source" position={Position.Right} id="right" className="!w-2.5 !h-2.5 !bg-slate-400 !border-2 !border-white" />
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white hover:!bg-blue-600 hover:!w-4 hover:!h-4 transition-all"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white hover:!bg-blue-600 hover:!w-4 hover:!h-4 transition-all"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left"
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white hover:!bg-blue-600 hover:!w-4 hover:!h-4 transition-all"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white hover:!bg-blue-600 hover:!w-4 hover:!h-4 transition-all"
+      />
     </div>
   );
 }

@@ -35,7 +35,15 @@ interface DiagramState {
   selectNode: (id: string | null) => void;
 
   // Edge ops
-  addEdge: (source: string, target: string, style?: Partial<EdgeStyleProps>) => void;
+  addEdge: (
+    source: string,
+    target: string,
+    options?: {
+      style?: Partial<EdgeStyleProps>;
+      sourceHandle?: string | null;
+      targetHandle?: string | null;
+    }
+  ) => void;
   updateEdgeData: (id: string, partial: Partial<EdgeStyleProps>) => void;
   deleteEdge: (id: string) => void;
   selectEdge: (id: string | null) => void;
@@ -500,14 +508,16 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
 
   selectNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
 
-  addEdge: (source, target, style) => {
+  addEdge: (source, target, options) => {
     const id = `edge_${uuidv4().slice(0, 8)}`;
     const newEdge: DiagramEdge = {
       id,
       source,
       target,
+      sourceHandle: options?.sourceHandle ?? null,
+      targetHandle: options?.targetHandle ?? null,
       type: "orthogonal",
-      data: { style: { ...defaultEdgeStyle, type: "orthogonal", ...style } },
+      data: { style: { ...defaultEdgeStyle, type: "orthogonal", ...options?.style } },
     };
     set((s) => ({
       project: { ...s.project, edges: [...s.project.edges, newEdge] },

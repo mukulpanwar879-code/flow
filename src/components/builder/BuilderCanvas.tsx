@@ -21,17 +21,36 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useDiagramStore } from "@/store/diagram-store";
-import { DiagramBlockNode } from "./DiagramBlockNode";
+import { nodeTypes } from "./DiagramBlockNode";
 import { defaultEdgeStyle } from "@/types/diagram";
 import { v4 as uuidv4 } from "uuid";
-
-const nodeTypes = { diagramBlock: DiagramBlockNode };
 
 const markerLookup = {
   none: undefined,
   arrow: MarkerType.Arrow,
   arrowclosed: MarkerType.ArrowClosed,
 } as const;
+
+// React Flow's built-in edge types: "default" (bezier), "straight", "step",
+// "smoothstep", "simplebezier". We map our "orthogonal" to "step" (with rounded
+// corners via style) since React Flow doesn't ship a true orthogonal router,
+// but step + smoothstep gives clean professional connectors.
+function rfEdgeType(type: string): string {
+  switch (type) {
+    case "orthogonal":
+    case "step":
+      return "step";
+    case "smoothstep":
+      return "smoothstep";
+    case "straight":
+      return "straight";
+    case "bezier":
+      return "simplebezier";
+    case "default":
+    default:
+      return "default";
+  }
+}
 
 function CanvasInner() {
   const project = useDiagramStore((s) => s.project);
@@ -42,38 +61,45 @@ function CanvasInner() {
   const selectedNodeId = useDiagramStore((s) => s.selectedNodeId);
   const selectedEdgeId = useDiagramStore((s) => s.selectedEdgeId);
 
-  // Map store -> React Flow nodes/edges
-  const rfNodes: Node[] = useMemo(
-    () =>
-      project.nodes.map((n) => ({
+  // Map store nodes -> React Flow nodes
+  // Order matters: non-interactive containers (swimlane, group) first so they render behind blocks.
+  const rfNodes: Node[] = useMemo(() => {
+    const ordered = [...project.nodes].sort((a, b) => {
+      const order = (t: string) => (t === "swimlane" ? 0 : t === "group" ? 1 : t === "timeline" ? 2 : 3);
+      return order(a.type) - order(b.type);
+    });
+    return ordered.map((n) => {
+      const base: Node = {
         id: n.id,
-        type: "diagramBlock",
+        type: n.type,
         position: n.position,
-        data: n.data,
+        data: n.data as any,
         selected: n.id === selectedNodeId,
-        width: n.data.width,
-        height: n.data.height,
-      })),
-    [project.nodes, selectedNodeId]
-  );
+      };
+      // Don't set explicit width/height for non-block nodes so RF uses intrinsic size
+      if (n.type === "diagramBlock") {
+        (base as any).width = (n.data as any).width;
+        (base as any).height = (n.data as any).height;
+      }
+      // Groups/swimlanes shouldn't be draggable by default (use header to drag),
+      // but we'll leave them draggable for now and just set proper z-index via order.
+      return base;
+    });
+  }, [project.nodes, selectedNodeId]);
 
   const rfEdges: Edge[] = useMemo(
     () =>
       project.edges.map((e) => {
         const s = e.data.style;
         const dashArray =
-          s.strokeStyle === "dashed"
-            ? "8 4"
-            : s.strokeStyle === "dotted"
-              ? "2 4"
-              : undefined;
+          s.strokeStyle === "dashed" ? "8 4" : s.strokeStyle === "dotted" ? "2 4" : undefined;
         return {
           id: e.id,
           source: e.source,
           target: e.target,
           sourceHandle: e.sourceHandle ?? null,
           targetHandle: e.targetHandle ?? null,
-          type: s.type,
+          type: rfEdgeType(s.type),
           animated: s.animated,
           selected: e.id === selectedEdgeId,
           label: s.label && s.label.trim() ? s.label : undefined,
@@ -83,10 +109,14 @@ function CanvasInner() {
             fontSize: s.labelFontSize ?? 12,
             fontWeight: 500,
           },
+          labelShowBg: true,
+          labelBgPadding: [6, 2] as [number, number],
+          labelBgBorderRadius: 4,
           style: {
             stroke: s.stroke,
             strokeWidth: s.strokeWidth,
             strokeDasharray: dashArray,
+            borderRadius: 8,
           },
           markerStart: markerLookup[s.sourceArrow],
           markerEnd: markerLookup[s.targetArrow],
@@ -98,7 +128,7 @@ function CanvasInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(rfNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(rfEdges);
 
-  // Sync RF local state when the store changes (style edits, undo/redo, import)
+  // Sync RF local state when the store changes
   const storeSig = useMemo(
     () => JSON.stringify(project.nodes) + "|" + JSON.stringify(project.edges),
     [project.nodes, project.edges]
@@ -115,13 +145,12 @@ function CanvasInner() {
   const onConnect = useCallback(
     (conn: Connection) => {
       addEdgeToStore(conn.source!, conn.target!);
-      // RF local edges will be repopulated via the store -> effect sync above
       setEdges((eds) =>
         addEdge(
           {
             ...conn,
             id: `edge_${uuidv4().slice(0, 8)}`,
-            type: "smoothstep",
+            type: "step",
             style: { stroke: defaultEdgeStyle.stroke, strokeWidth: defaultEdgeStyle.strokeWidth },
             markerEnd: MarkerType.ArrowClosed,
           },
@@ -132,31 +161,16 @@ function CanvasInner() {
     [addEdgeToStore, setEdges]
   );
 
-  const onNodeClick: NodeMouseHandler = useCallback(
-    (_, node) => selectNode(node.id),
-    [selectNode]
-  );
-
-  const onEdgeClick: EdgeMouseHandler = useCallback(
-    (_, edge) => selectEdge(edge.id),
-    [selectEdge]
-  );
-
-  const onNodeDragStop: NodeMouseHandler = useCallback(
-    (_, node) => updateNodePosition(node.id, node.position),
-    [updateNodePosition]
-  );
-
+  const onNodeClick: NodeMouseHandler = useCallback((_, node) => selectNode(node.id), [selectNode]);
+  const onEdgeClick: EdgeMouseHandler = useCallback((_, edge) => selectEdge(edge.id), [selectEdge]);
+  const onNodeDragStop: NodeMouseHandler = useCallback((_, node) => updateNodePosition(node.id, node.position), [updateNodePosition]);
   const onPaneClick = useCallback(() => {
     selectNode(null);
     selectEdge(null);
   }, [selectNode, selectEdge]);
 
   return (
-    <div
-      className="relative w-full h-full"
-      style={{ background: project.canvas.background }}
-    >
+    <div className="relative w-full h-full" style={{ background: project.canvas.background }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -175,7 +189,9 @@ function CanvasInner() {
         proOptions={{ hideAttribution: true }}
         snapToGrid={project.canvas.snapToGrid}
         snapGrid={[project.canvas.gridSize, project.canvas.gridSize]}
-        defaultEdgeOptions={{ type: "smoothstep", markerEnd: MarkerType.ArrowClosed }}
+        defaultEdgeOptions={{ type: "step", markerEnd: MarkerType.ArrowClosed }}
+        minZoom={0.1}
+        maxZoom={2}
       >
         {project.canvas.showGrid && (
           <Background
@@ -190,7 +206,10 @@ function CanvasInner() {
           position="bottom-left"
           className="!bg-background !border"
           maskColor="rgba(15, 23, 42, 0.05)"
-          nodeColor={(n) => (n.data as { style?: { fill?: string } })?.style?.fill ?? "#cbd5e1"}
+          nodeColor={(n) => {
+            const d = n.data as any;
+            return d?.style?.fill ?? d?.fill ?? "#cbd5e1";
+          }}
         />
       </ReactFlow>
     </div>

@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, FileText, Box, Spline, Palette, Code2, Download, Loader2 } from "lucide-react";
+import { Copy, Check, FileText, Box, Spline, Palette, Code2, Download, Loader2, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -246,10 +246,11 @@ export function DocsView() {
           </Card>
 
           <Tabs defaultValue="schema" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 mb-6">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 mb-6">
               <TabsTrigger value="schema" className="text-xs"><Code2 className="h-3 w-3 mr-1" /> Schema</TabsTrigger>
               <TabsTrigger value="blocks" className="text-xs"><Box className="h-3 w-3 mr-1" /> Blocks</TabsTrigger>
               <TabsTrigger value="edges" className="text-xs"><Spline className="h-3 w-3 mr-1" /> Edges</TabsTrigger>
+              <TabsTrigger value="enterprise" className="text-xs"><Building2 className="h-3 w-3 mr-1" /> Enterprise</TabsTrigger>
               <TabsTrigger value="examples" className="text-xs"><Palette className="h-3 w-3 mr-1" /> Examples</TabsTrigger>
             </TabsList>
 
@@ -426,6 +427,224 @@ export function DocsView() {
                     ["labelFontSize?", "number", "Label font size in px"],
                   ]}
                 />
+              </Card>
+            </TabsContent>
+
+            {/* Enterprise node types */}
+            <TabsContent value="enterprise" className="space-y-5">
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Group / Container</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Groups visually contain related nodes. Set <code className="bg-muted px-1 rounded">children</code> to an array of node IDs that belong to the group.
+                  Groups support collapse, dashed borders, and a title/subtitle header.
+                </p>
+                <CodeBlock code={`{
+  "id": "phase1",
+  "type": "group",
+  "position": { "x": 100, "y": 280 },
+  "data": {
+    "title": "Safety Impact Assessment",
+    "subtitle": "Phase 1 of escalation",
+    "children": ["employee_safety", "product_safety", "severity_assessment"],
+    "width": 480,
+    "height": 200,
+    "fill": "#fefce8",
+    "stroke": "#ca8a04",
+    "strokeStyle": "dashed",
+    "textColor": "#713f12",
+    "collapsible": true,
+    "collapsed": false
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Annotation</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Free-floating labels for section headings, governance notes, or explanatory text. Not connected to nodes.
+                </p>
+                <CodeBlock code={`{
+  "id": "annotation1",
+  "type": "annotation",
+  "position": { "x": 600, "y": 30 },
+  "data": {
+    "text": "Emergency Response & Functional Escalation",
+    "fontSize": 16,
+    "fontWeight": 700,
+    "color": "#7c2d12",
+    "align": "center",
+    "italic": false,
+    "width": 400
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Brace / Bracket</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Vertical or horizontal curly braces for grouping escalation phases, governance layers, or workflow segments visually.
+                </p>
+                <CodeBlock code={`{
+  "id": "brace1",
+  "type": "brace",
+  "position": { "x": 1180, "y": 120 },
+  "data": {
+    "orientation": "vertical",
+    "length": 380,
+    "label": "Leadership Escalation",
+    "stroke": "#9333ea",
+    "strokeWidth": 2,
+    "labelColor": "#581c87",
+    "fontSize": 12
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Swimlane</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Department-based lanes for RACI matrices, escalation matrices, and governance frameworks.
+                  Use <code className="bg-muted px-1 rounded">assignments</code> to map node IDs to lane IDs.
+                </p>
+                <CodeBlock code={`{
+  "id": "swimlane",
+  "type": "swimlane",
+  "position": { "x": 40, "y": 80 },
+  "data": {
+    "title": "Critical Safety Incident Escalation",
+    "lanes": [
+      { "id": "ops", "label": "Operations", "fill": "#dcfce7", "textColor": "#14532d" },
+      { "id": "safety", "label": "Safety", "fill": "#fef9c3", "textColor": "#713f12" },
+      { "id": "leadership", "label": "Leadership", "fill": "#fee2e2", "textColor": "#7f1d1d" }
+    ],
+    "width": 1100,
+    "laneHeight": 180,
+    "fill": "#ffffff",
+    "stroke": "#cbd5e1",
+    "textColor": "#0f172a",
+    "assignments": {
+      "report": "ops",
+      "severity": "safety",
+      "hod": "leadership"
+    }
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Timeline</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Process timelines for escalation, RCA, and CAPA milestones. Supports vertical or horizontal orientation with numbered milestones.
+                </p>
+                <CodeBlock code={`{
+  "id": "timeline",
+  "type": "timeline",
+  "position": { "x": 1240, "y": 120 },
+  "data": {
+    "title": "Escalation Timeline",
+    "milestones": [
+      { "id": "t0", "label": "Incident", "subtitle": "T+0", "fill": "#dc2626", "textColor": "#ffffff" },
+      { "id": "t1", "label": "15 min", "subtitle": "Site response", "fill": "#f59e0b", "textColor": "#ffffff" },
+      { "id": "t2", "label": "30 min", "subtitle": "Safety review", "fill": "#ca8a04", "textColor": "#ffffff" },
+      { "id": "t3", "label": "72 hrs", "subtitle": "RCA submitted", "fill": "#2563eb", "textColor": "#ffffff" },
+      { "id": "t4", "label": "30 days", "subtitle": "CAPA closed", "fill": "#16a34a", "textColor": "#ffffff" }
+    ],
+    "orientation": "vertical",
+    "width": 180,
+    "stroke": "#cbd5e1",
+    "milestoneFill": "#ffffff",
+    "textColor": "#0f172a"
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">SLA / KPI Badges (on blocks)</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Add a <code className="bg-muted px-1 rounded">badge</code> to any diagramBlock to show response timelines, escalation SLAs, or compliance indicators.
+                </p>
+                <CodeBlock code={`{
+  "id": "safety_team",
+  "type": "diagramBlock",
+  "position": { "x": 400, "y": 320 },
+  "data": {
+    "label": "Safety Team",
+    "shape": "rectangle",
+    "width": 150,
+    "height": 80,
+    "style": { "fill": "#fee2e2", "stroke": "#dc2626", "strokeWidth": 2, "textColor": "#7f1d1d", "fontSize": 14, "fontWeight": 500, "fontFamily": "Inter, sans-serif", "opacity": 1 },
+    "badge": {
+      "text": "30 Min",
+      "fill": "#dc2626",
+      "textColor": "#ffffff",
+      "position": "top-right"
+    }
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Decision Criteria (on blocks)</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Add a <code className="bg-muted px-1 rounded">criteria</code> array to any block (typically a diamond) to document the branches a decision node evaluates.
+                </p>
+                <CodeBlock code={`{
+  "id": "severity_assessment",
+  "type": "diagramBlock",
+  "position": { "x": 150, "y": 310 },
+  "data": {
+    "label": "Severity Assessment",
+    "shape": "diamond",
+    "width": 220,
+    "height": 130,
+    "style": { "fill": "#fef9c3", "stroke": "#ca8a04", "strokeWidth": 2, "textColor": "#713f12", "fontSize": 14, "fontWeight": 500, "fontFamily": "Inter, sans-serif", "opacity": 1 },
+    "criteria": ["Fire", "Signage Collapse", "Theft", "Water Ingress", "Pest Infestation"]
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Ownership Metadata (on blocks)</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Add <code className="bg-muted px-1 rounded">ownership</code> to any block to document owner, approver, reviewer, and department — visible in exports and the inspector.
+                </p>
+                <CodeBlock code={`{
+  "data": {
+    "label": "HOD Approval",
+    "shape": "rectangle",
+    "ownership": {
+      "owner": "HOD Safety",
+      "approver": "P&L Head",
+      "reviewer": "Safety Committee",
+      "department": "Safety"
+    }
+  }
+}`} />
+              </Card>
+
+              <Card className="p-5">
+                <h3 className="font-semibold mb-2">Orthogonal Edge Routing</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Set <code className="bg-muted px-1 rounded">type: "orthogonal"</code> on any edge for clean step-style connectors suitable for executive presentations.
+                </p>
+                <CodeBlock code={`{
+  "id": "e1",
+  "source": "report",
+  "target": "site_team",
+  "type": "orthogonal",
+  "data": {
+    "style": {
+      "stroke": "#475569",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "type": "orthogonal",
+      "animated": true,
+      "sourceArrow": "none",
+      "targetArrow": "arrowclosed",
+      "label": "Critical"
+    }
+  }
+}`} />
               </Card>
             </TabsContent>
 

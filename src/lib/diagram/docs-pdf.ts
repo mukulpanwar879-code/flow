@@ -273,9 +273,17 @@ export function generateDocsPDF(): Blob {
     "8. Edge Object",
     "9. EdgeStyle Options (Enums)",
     "10. EdgeStyleProps Object",
-    "11. Full Reference Example",
-    "12. Minimal Example",
-    "13. Tips & Validation Rules",
+    "11. Enterprise Node Types",
+    "12. Group / Container",
+    "13. Annotation",
+    "14. Brace / Bracket",
+    "15. Swimlane",
+    "16. Timeline",
+    "17. SLA Badges, Criteria & Ownership",
+    "18. Orthogonal Edge Routing",
+    "19. Full Reference Example",
+    "20. Minimal Example",
+    "21. Tips & Validation Rules",
   ];
   toc.forEach((line) => {
     doc.setFont("helvetica", "normal");
@@ -418,21 +426,123 @@ export function generateDocsPDF(): Blob {
     ["labelFontSize?", "number", "Label font size in px"],
   ]);
 
-  // ============ 11. Full Example ============
+  // ============ 11. Enterprise Node Types ============
 
-  writeHeading("11. Full Reference Example", 2);
+  writeHeading("11. Enterprise Node Types", 2);
+  writeParagraph("FlowForge supports six node types beyond the standard diagramBlock. Each is designed for governance, escalation, RCA/CAPA, and leadership-review diagrams. All node types share a common shape: id, type, position, and data — but the data object differs per type.");
+
+  writeHeading("12. Group / Container", 2);
+  writeParagraph("Groups visually contain related nodes. Set children to an array of node IDs. Groups support collapse, dashed borders, and a title/subtitle header. Use cases: safety phases, governance sections, business process grouping, department ownership.");
+  writeFieldTable([
+    ["title", "string", "Group heading (shown in header)"],
+    ["subtitle?", "string", "Optional secondary description"],
+    ["children", "string[]", "Array of node IDs that belong to the group"],
+    ["width", "number", "Group width in px"],
+    ["height", "number", "Group height in px (when expanded)"],
+    ["fill", "string (hex)", "Background color"],
+    ["stroke", "string (hex)", "Border color"],
+    ["strokeStyle", "EdgeStrokeStyle", "solid | dashed | dotted"],
+    ["textColor", "string (hex)", "Title text color"],
+    ["collapsible", "boolean", "Show collapse toggle"],
+    ["collapsed", "boolean", "Initial collapsed state"],
+  ]);
+
+  writeHeading("13. Annotation", 2);
+  writeParagraph("Free-floating labels not connected to nodes. Use cases: section labels, explanatory notes, governance descriptions, escalation instructions. Supports multi-line text, alignment, and italic style.");
+  writeFieldTable([
+    ["text", "string", "Annotation text (supports \\n for line breaks)"],
+    ["fontSize", "number", "Font size in px"],
+    ["fontWeight", "number", "Font weight 300-800"],
+    ["color", "string (hex)", "Text color"],
+    ["align", "string", "left | center | right"],
+    ["italic", "boolean", "Render text in italic"],
+    ["width", "number", "Annotation width in px"],
+  ]);
+
+  writeHeading("14. Brace / Bracket", 2);
+  writeParagraph("Vertical or horizontal curly braces for visually grouping escalation phases, governance layers, responsibility mapping, or workflow segments. Renders as an SVG path with optional rotated label.");
+  writeFieldTable([
+    ["orientation", "string", "vertical | horizontal"],
+    ["length", "number", "Span of the brace in px"],
+    ["label?", "string", "Optional label shown alongside the brace"],
+    ["stroke", "string (hex)", "Brace color"],
+    ["strokeWidth", "number", "Brace thickness"],
+    ["labelColor", "string (hex)", "Label text color"],
+    ["fontSize", "number", "Label font size in px"],
+  ]);
+
+  writeHeading("15. Swimlane", 2);
+  writeParagraph("Department-based lanes for RACI matrices, escalation matrices, and governance frameworks. Use assignments to map node IDs to lane IDs. Lanes are rendered as labeled rows with configurable fill colors.");
+  writeFieldTable([
+    ["title?", "string", "Optional swimlane title shown in header"],
+    ["lanes", "SwimlaneLane[]", "Array of lane definitions (id, label, fill, textColor)"],
+    ["width", "number", "Total swimlane width in px"],
+    ["laneHeight", "number", "Height of each lane in px"],
+    ["fill", "string (hex)", "Background color"],
+    ["stroke", "string (hex)", "Border color"],
+    ["textColor", "string (hex)", "Title text color"],
+    ["assignments?", "object", "Map of nodeId -> laneId"],
+  ]);
+
+  writeHeading("16. Timeline", 2);
+  writeParagraph("Process timelines for escalation, RCA, and CAPA milestones. Supports vertical or horizontal orientation with numbered, colored milestones. Use cases: escalation timelines, RCA timelines, CAPA timelines, audit timelines.");
+  writeFieldTable([
+    ["title?", "string", "Optional timeline title"],
+    ["milestones", "TimelineMilestone[]", "Array of milestones (id, label, subtitle, fill, textColor)"],
+    ["orientation", "string", "vertical | horizontal"],
+    ["width", "number", "Timeline width in px"],
+    ["stroke", "string (hex)", "Connector line color"],
+    ["milestoneFill", "string (hex)", "Default milestone fill (overridden per-milestone)"],
+    ["textColor", "string (hex)", "Default label text color"],
+  ]);
+
+  writeHeading("17. SLA Badges, Criteria & Ownership (on blocks)", 2);
+  writeParagraph("Three optional fields can be added to any diagramBlock to enrich it for governance use. Badges show response-time SLAs. Criteria document decision branches. Ownership records who owns, approves, and reviews the step.");
+  writeFieldTable([
+    ["badge?", "object", "SLA/KPI pill: { text, fill, textColor, position }"],
+    ["badge.text", "string", "Badge label, e.g. '15 Min'"],
+    ["badge.fill", "string (hex)", "Badge background color"],
+    ["badge.position", "string", "top-right | top-left | bottom-right | bottom-left"],
+    ["criteria?", "string[]", "List of decision branches (e.g. Fire, Theft)"],
+    ["ownership?", "object", "{ owner, approver, reviewer, department }"],
+  ]);
+
+  writeHeading("18. Orthogonal Edge Routing", 2);
+  writeParagraph("Set type: 'orthogonal' on any edge for clean step-style connectors suitable for executive presentations. This produces right-angle paths that avoid overlap and look professional in leadership decks. Combined with animated: true, edges show flow direction visually.");
+  writeCode(`{
+  "id": "e1",
+  "source": "report",
+  "target": "site_team",
+  "type": "orthogonal",
+  "data": {
+    "style": {
+      "stroke": "#475569",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "type": "orthogonal",
+      "animated": true,
+      "sourceArrow": "none",
+      "targetArrow": "arrowclosed",
+      "label": "Critical"
+    }
+  }
+}`);
+
+  // ============ 19. Full Example ============
+
+  writeHeading("19. Full Reference Example", 2);
   writeParagraph("A complete diagram with one node and one edge, showing every property in context.");
   writeCode(FULL_EXAMPLE);
 
-  // ============ 12. Minimal Example ============
+  // ============ 20. Minimal Example ============
 
-  writeHeading("12. Minimal Example", 2);
+  writeHeading("20. Minimal Example", 2);
   writeParagraph("The smallest valid diagram — two blocks and one connector.");
   writeCode(MINIMAL_EXAMPLE);
 
-  // ============ 13. Tips ============
+  // ============ 21. Tips ============
 
-  writeHeading("13. Tips & Validation Rules", 2);
+  writeHeading("21. Tips & Validation Rules", 2);
   writeBullet("Node id must be unique within a project. Duplicate ids will cause edges to attach unpredictably.");
   writeBullet("Edge source and target must reference existing node ids. The Render view rejects JSON with broken references.");
   writeBullet("All color values are hex strings, e.g. #dcfce7. RGB and named colors are not supported.");

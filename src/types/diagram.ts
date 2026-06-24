@@ -1,6 +1,8 @@
 // Core type definitions for the modular diagram builder.
-// Every block & edge is fully described by a plain JSON object so the entire
-// canvas can be serialized, shared, and re-rendered from JSON input.
+// Every block, edge, group, annotation, brace, swimlane, etc. is fully described
+// by a plain JSON object so the entire canvas can be serialized & re-rendered.
+
+// ============ Basic shapes (existing) ============
 
 export type BlockShape =
   | "rectangle"
@@ -15,7 +17,7 @@ export type BlockShape =
   | "document"
   | "terminator";
 
-export type EdgeStyle = "default" | "straight" | "step" | "smoothstep" | "bezier";
+export type EdgeStyle = "default" | "straight" | "step" | "smoothstep" | "bezier" | "orthogonal";
 export type EdgeStrokeStyle = "solid" | "dashed" | "dotted";
 export type ArrowType = "none" | "arrow" | "arrowclosed";
 
@@ -33,6 +35,20 @@ export interface BlockStyle {
   shadow?: boolean;
 }
 
+export interface BadgeData {
+  text: string;
+  fill?: string;
+  textColor?: string;
+  position?: "top-right" | "top-left" | "bottom-right" | "bottom-left";
+}
+
+export interface OwnershipData {
+  owner?: string;
+  approver?: string;
+  reviewer?: string;
+  department?: string;
+}
+
 export interface BlockData {
   label: string;
   subtitle?: string;
@@ -41,14 +57,140 @@ export interface BlockData {
   style: BlockStyle;
   width: number;
   height: number;
+  badge?: BadgeData;
+  ownership?: OwnershipData;
+  // Decision-node criteria (for shape: "diamond" or any block acting as a decision)
+  criteria?: string[];
+  // Free-form metadata for audits / governance
+  metadata?: Record<string, string>;
 }
 
-export interface DiagramNode {
+// ============ Groups / Containers ============
+
+export interface GroupNode {
   id: string;
-  type: "diagramBlock";
+  type: "group";
+  position: { x: number; y: number };
+  data: {
+    title: string;
+    subtitle?: string;
+    children: string[]; // node ids that belong to this group
+    width?: number;
+    height?: number;
+    fill?: string;
+    stroke?: string;
+    strokeStyle?: EdgeStrokeStyle;
+    textColor?: string;
+    collapsible?: boolean;
+    collapsed?: boolean;
+  };
+}
+
+// ============ Annotations ============
+
+export interface AnnotationNode {
+  id: string;
+  type: "annotation";
+  position: { x: number; y: number };
+  data: {
+    text: string;
+    fontSize?: number;
+    fontWeight?: number;
+    color?: string;
+    align?: "left" | "center" | "right";
+    italic?: boolean;
+    width?: number;
+  };
+}
+
+// ============ Braces ============
+
+export type BraceOrientation = "vertical" | "horizontal";
+
+export interface BraceNode {
+  id: string;
+  type: "brace";
+  position: { x: number; y: number };
+  data: {
+    orientation: BraceOrientation;
+    length: number; // px span of the brace
+    label?: string;
+    stroke?: string;
+    strokeWidth?: number;
+    labelColor?: string;
+    fontSize?: number;
+  };
+}
+
+// ============ Swimlanes ============
+
+export interface SwimlaneLane {
+  id: string;
+  label: string;
+  fill?: string;
+  textColor?: string;
+}
+
+export interface SwimlaneNode {
+  id: string;
+  type: "swimlane";
+  position: { x: number; y: number };
+  data: {
+    title?: string;
+    lanes: SwimlaneLane[];
+    width: number;
+    laneHeight: number;
+    fill?: string;
+    stroke?: string;
+    textColor?: string;
+    // Map of nodeId -> laneId (which lane each node belongs to)
+    assignments?: Record<string, string>;
+  };
+}
+
+// ============ Timeline ============
+
+export interface TimelineMilestone {
+  id: string;
+  label: string;
+  subtitle?: string;
+  fill?: string;
+  textColor?: string;
+}
+
+export interface TimelineNode {
+  id: string;
+  type: "timeline";
+  position: { x: number; y: number };
+  data: {
+    title?: string;
+    milestones: TimelineMilestone[];
+    orientation?: "vertical" | "horizontal";
+    width?: number;
+    stroke?: string;
+    fillColor?: string;
+    milestoneFill?: string;
+    textColor?: string;
+  };
+}
+
+// ============ Unified node union ============
+
+export type DiagramNode =
+  | (BaseNode & { type: "diagramBlock" })
+  | GroupNode
+  | AnnotationNode
+  | BraceNode
+  | SwimlaneNode
+  | TimelineNode;
+
+interface BaseNode {
+  id: string;
   position: { x: number; y: number };
   data: BlockData;
 }
+
+// ============ Edges ============
 
 export interface EdgeStyleProps {
   stroke: string;
@@ -62,6 +204,7 @@ export interface EdgeStyleProps {
   labelBgColor?: string;
   labelTextColor?: string;
   labelFontSize?: number;
+  routing?: "default" | "orthogonal";
 }
 
 export interface DiagramEdge {
@@ -96,6 +239,8 @@ export interface DiagramProject {
   edges: DiagramEdge[];
 }
 
+// ============ Defaults ============
+
 export const defaultBlockStyle: BlockStyle = {
   fill: "#ffffff",
   stroke: "#0f172a",
@@ -113,7 +258,7 @@ export const defaultEdgeStyle: EdgeStyleProps = {
   stroke: "#475569",
   strokeWidth: 2,
   strokeStyle: "solid",
-  type: "default",
+  type: "smoothstep",
   animated: false,
   sourceArrow: "none",
   targetArrow: "arrowclosed",
@@ -121,6 +266,7 @@ export const defaultEdgeStyle: EdgeStyleProps = {
   labelBgColor: "#ffffff",
   labelTextColor: "#0f172a",
   labelFontSize: 12,
+  routing: "default",
 };
 
 export const defaultCanvas: DiagramCanvas = {
@@ -153,6 +299,7 @@ export const edgeTypeOptions: { value: EdgeStyle; label: string }[] = [
   { value: "step", label: "Step" },
   { value: "smoothstep", label: "Smooth Step" },
   { value: "bezier", label: "Bezier" },
+  { value: "orthogonal", label: "Orthogonal (no overlap)" },
 ];
 
 export const strokeStyleOptions: { value: EdgeStrokeStyle; label: string }[] = [
@@ -165,4 +312,22 @@ export const arrowOptions: { value: ArrowType; label: string }[] = [
   { value: "none", label: "None" },
   { value: "arrow", label: "Open Arrow" },
   { value: "arrowclosed", label: "Closed Arrow" },
+];
+
+// Used by the BlockPalette to offer all enterprise node types
+export type NodeType =
+  | "diagramBlock"
+  | "group"
+  | "annotation"
+  | "brace"
+  | "swimlane"
+  | "timeline";
+
+export const nodeTypeOptions: { value: NodeType; label: string; icon: string; description: string }[] = [
+  { value: "diagramBlock", label: "Block", icon: "▭", description: "Standard shape (rect, diamond, etc.)" },
+  { value: "group", label: "Group", icon: "⬚", description: "Container around related nodes" },
+  { value: "annotation", label: "Annotation", icon: "📝", description: "Free-floating label" },
+  { value: "brace", label: "Brace", icon: "{", description: "Vertical or horizontal bracket" },
+  { value: "swimlane", label: "Swimlane", icon: "▦", description: "Department / RACI lanes" },
+  { value: "timeline", label: "Timeline", icon: "↔", description: "Process milestones" },
 ];

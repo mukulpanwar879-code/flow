@@ -1,4 +1,4 @@
-import { BlockShape } from "@/types/diagram";
+import { BlockShape, BraceOrientation } from "@/types/diagram";
 
 // Returns an SVG path string for the given shape within a width×height box.
 // Coordinates are in local SVG space (0,0 = top-left).
@@ -65,6 +65,39 @@ export function getShapePath(shape: BlockShape, width: number, height: number): 
 function roundedRectPath(w: number, h: number, r: number): string {
   const rr = Math.min(r, w / 2, h / 2);
   return `M ${rr} 0 H ${w - rr} Q ${w} 0 ${w} ${rr} V ${h - rr} Q ${w} ${h} ${w - rr} ${h} H ${rr} Q 0 ${h} 0 ${h - rr} V ${rr} Q 0 0 ${rr} 0 Z`;
+}
+
+// Returns the SVG path for a curly brace.
+// Vertical brace: spans `length` px vertically, opens to the right.
+// Horizontal brace: spans `length` px horizontally, opens downward.
+export function getBracePath(orientation: BraceOrientation, length: number): string {
+  const L = Math.max(20, length);
+  const tip = 10; // how far the brace tip protrudes
+  const arm = L / 2;
+  const curve = 6; // size of the curl
+
+  if (orientation === "vertical") {
+    // Top arm curving right, midpoint tip pointing right, bottom arm curving right
+    return [
+      `M 0 0`,
+      `Q ${curve} 0 ${curve} ${curve}`,
+      `L ${curve} ${arm - curve}`,
+      `Q ${curve} ${arm} ${tip} ${arm}`,
+      `Q ${curve} ${arm} ${curve} ${arm + curve}`,
+      `L ${curve} ${L - curve}`,
+      `Q ${curve} ${L} 0 ${L}`,
+    ].join(" ");
+  } else {
+    return [
+      `M 0 0`,
+      `Q 0 ${curve} ${curve} ${curve}`,
+      `L ${arm - curve} ${curve}`,
+      `Q ${arm} ${curve} ${arm} ${tip}`,
+      `Q ${arm} ${curve} ${arm + curve} ${curve}`,
+      `L ${L - curve} ${curve}`,
+      `Q ${L} ${curve} ${L} 0`,
+    ].join(" ");
+  }
 }
 
 // Returns a Tailwind/CSS-like filter string for drop-shadow.

@@ -1,10 +1,10 @@
 "use client";
 
 import { useDiagramStore } from "@/store/diagram-store";
-import { blockShapeOptions, BlockShape } from "@/types/diagram";
+import { blockShapeOptions, nodeTypeOptions, BlockShape, NodeType } from "@/types/diagram";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getShapePath } from "@/lib/diagram/shapes";
+import { getShapePath, getBracePath } from "@/lib/diagram/shapes";
 import { Plus, Trash2, Copy, Undo2, Redo2, FileJson, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,15 +22,25 @@ export function BlockPalette({ onImportClick, onExportClick }: BlockPaletteProps
   const history = useDiagramStore((s) => s.history);
   const future = useDiagramStore((s) => s.future);
 
-  const handleAdd = (shape: BlockShape) => {
-    // Place in a slightly random position so multiple blocks don't overlap.
-    addNode(shape, { x: 200 + Math.random() * 200, y: 160 + Math.random() * 200 });
+  const handleAddBlock = (shape: BlockShape) => {
+    addNode("diagramBlock", { x: 200 + Math.random() * 200, y: 160 + Math.random() * 200 }, "New Block");
+    // Apply shape after creation
+    setTimeout(() => {
+      const store = useDiagramStore.getState();
+      if (store.selectedNodeId) {
+        store.updateNodeData(store.selectedNodeId, { shape });
+      }
+    }, 10);
+  };
+
+  const handleAddType = (type: NodeType) => {
+    addNode(type, { x: 200 + Math.random() * 200, y: 160 + Math.random() * 200 });
   };
 
   return (
     <Card className="h-full flex flex-col p-0 overflow-hidden border-r">
       <div className="px-4 py-3 border-b">
-        <h3 className="text-sm font-semibold">Blocks</h3>
+        <h3 className="text-sm font-semibold">Elements</h3>
         <p className="text-xs text-muted-foreground mt-0.5">Click to add to canvas</p>
       </div>
 
@@ -80,37 +90,68 @@ export function BlockPalette({ onImportClick, onExportClick }: BlockPaletteProps
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-3 grid grid-cols-2 gap-2">
-          {blockShapeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => handleAdd(opt.value)}
-              className="group flex flex-col items-center justify-center gap-1 rounded-md border border-border bg-background p-3 hover:bg-accent hover:border-primary/40 transition-all"
-            >
-              <svg width="44" height="32" className="overflow-visible">
-                <path
-                  d={getShapePath(opt.value, 44, 32)}
-                  fill="#f8fafc"
-                  stroke="#475569"
-                  strokeWidth={1.5}
-                  className="group-hover:stroke-primary transition-colors"
-                />
-              </svg>
-              <span className="text-[10px] text-muted-foreground group-hover:text-foreground">
-                {opt.label}
-              </span>
-            </button>
-          ))}
+        {/* Enterprise node types */}
+        <div className="p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Node Types
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {nodeTypeOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleAddType(opt.value)}
+                title={opt.description}
+                className="group flex flex-col items-center justify-center gap-1 rounded-md border border-border bg-background p-3 hover:bg-accent hover:border-primary/40 transition-all"
+              >
+                <span className="text-lg leading-none">{opt.icon}</span>
+                <span className="text-[10px] text-muted-foreground group-hover:text-foreground">
+                  {opt.label}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
+        {/* Standard block shapes */}
         <div className="p-3 border-t">
-          <p className="text-xs text-muted-foreground mb-2">Quick add</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Block Shapes
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {blockShapeOptions.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => handleAddBlock(opt.value)}
+                className="group flex flex-col items-center justify-center gap-1 rounded-md border border-border bg-background p-3 hover:bg-accent hover:border-primary/40 transition-all"
+              >
+                <svg width="44" height="32" className="overflow-visible">
+                  <path
+                    d={getShapePath(opt.value, 44, 32)}
+                    fill="#f8fafc"
+                    stroke="#475569"
+                    strokeWidth={1.5}
+                    className="group-hover:stroke-primary transition-colors"
+                  />
+                </svg>
+                <span className="text-[10px] text-muted-foreground group-hover:text-foreground">
+                  {opt.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick add */}
+        <div className="p-3 border-t">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+            Quick Add
+          </p>
           <div className="flex flex-wrap gap-1">
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-xs"
-              onClick={() => addNode("rectangle", undefined, "New Step")}
+              onClick={() => addNode("diagramBlock", undefined, "New Step")}
             >
               <Plus className="h-3 w-3 mr-1" /> Step
             </Button>
@@ -118,17 +159,44 @@ export function BlockPalette({ onImportClick, onExportClick }: BlockPaletteProps
               size="sm"
               variant="outline"
               className="h-7 text-xs"
-              onClick={() => addNode("terminator", undefined, "Start")}
+              onClick={() => {
+                const id = addNode("diagramBlock", undefined, "Decision");
+                setTimeout(() => useDiagramStore.getState().updateNodeData(id, { shape: "diamond" }), 10);
+              }}
             >
-              <Plus className="h-3 w-3 mr-1" /> Start
+              <Plus className="h-3 w-3 mr-1" /> Decision
             </Button>
             <Button
               size="sm"
               variant="outline"
               className="h-7 text-xs"
-              onClick={() => addNode("diamond", undefined, "Decision")}
+              onClick={() => addNode("group")}
             >
-              <Plus className="h-3 w-3 mr-1" /> Decision
+              <Plus className="h-3 w-3 mr-1" /> Group
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => addNode("swimlane")}
+            >
+              <Plus className="h-3 w-3 mr-1" /> Swimlane
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => addNode("timeline")}
+            >
+              <Plus className="h-3 w-3 mr-1" /> Timeline
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              onClick={() => addNode("annotation")}
+            >
+              <Plus className="h-3 w-3 mr-1" /> Note
             </Button>
           </div>
         </div>

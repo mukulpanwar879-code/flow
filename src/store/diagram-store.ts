@@ -11,6 +11,9 @@ import {
   BlockData,
   EdgeStyle,
   EdgeStyleProps,
+  NodeType,
+  SwimlaneLane,
+  TimelineMilestone,
   defaultBlockStyle,
   defaultEdgeStyle,
   defaultCanvas,
@@ -24,8 +27,8 @@ interface DiagramState {
   future: DiagramProject[];
 
   // Node ops
-  addNode: (shape?: BlockShape, position?: { x: number; y: number }, label?: string) => string;
-  updateNodeData: (id: string, partial: Partial<BlockData>) => void;
+  addNode: (type?: NodeType, position?: { x: number; y: number }, label?: string) => string;
+  updateNodeData: (id: string, partial: Record<string, unknown>) => void;
   updateNodePosition: (id: string, position: { x: number; y: number }) => void;
   deleteNode: (id: string) => void;
   duplicateNode: (id: string) => void;
@@ -51,76 +54,208 @@ interface DiagramState {
   undo: () => void;
   redo: () => void;
   pushHistory: () => void;
+
+  // Enterprise helpers
+  toggleGroupCollapse: (id: string) => void;
+  assignNodeToLane: (nodeId: string, laneId: string) => void;
 }
 
+// ============ Starter enterprise example ============
+// A real-world Critical Safety Incident Escalation Framework with groups,
+// swimlanes, decisions, badges, ownership, and a timeline.
+
 const starterNodes: DiagramNode[] = [
+  // Swimlane (background)
   {
-    id: "start",
-    type: "diagramBlock",
-    position: { x: 80, y: 80 },
+    id: "swimlane",
+    type: "swimlane",
+    position: { x: 40, y: 80 },
     data: {
-      label: "Start",
-      shape: "terminator",
-      width: 160,
-      height: 60,
-      style: {
-        ...defaultBlockStyle,
-        fill: "#dcfce7",
-        stroke: "#16a34a",
-        textColor: "#14532d",
+      title: "Critical Safety Incident Escalation",
+      lanes: [
+        { id: "ops", label: "Operations", fill: "#eff6ff", textColor: "#1e3a8a" },
+        { id: "safety", label: "Safety", fill: "#fef9c3", textColor: "#713f12" },
+        { id: "leadership", label: "Leadership", fill: "#fee2e2", textColor: "#7f1d1d" },
+      ],
+      width: 1200,
+      laneHeight: 220,
+      fill: "#ffffff",
+      stroke: "#cbd5e1",
+      textColor: "#0f172a",
+      assignments: {
+        "report": "ops",
+        "site_team": "ops",
+        "severity": "safety",
+        "safety_team": "safety",
+        "hod": "leadership",
+        "pl_head": "leadership",
       },
     },
   },
+  // Timeline
   {
-    id: "process",
-    type: "diagramBlock",
-    position: { x: 80, y: 220 },
+    id: "timeline",
+    type: "timeline",
+    position: { x: 1280, y: 80 },
     data: {
-      label: "Process Data",
-      subtitle: "Transform input",
-      shape: "rectangle",
-      width: 200,
-      height: 80,
-      style: {
-        ...defaultBlockStyle,
-        fill: "#dbeafe",
-        stroke: "#2563eb",
-        textColor: "#1e3a8a",
-      },
-    },
-  },
-  {
-    id: "decision",
-    type: "diagramBlock",
-    position: { x: 100, y: 360 },
-    data: {
-      label: "Valid?",
-      shape: "diamond",
+      title: "Escalation Timeline",
+      milestones: [
+        { id: "t0", label: "Incident", subtitle: "T+0", fill: "#dc2626", textColor: "#ffffff" },
+        { id: "t1", label: "15 min", subtitle: "Site response", fill: "#f59e0b", textColor: "#ffffff" },
+        { id: "t2", label: "30 min", subtitle: "Safety review", fill: "#ca8a04", textColor: "#ffffff" },
+        { id: "t3", label: "72 hrs", subtitle: "RCA submitted", fill: "#2563eb", textColor: "#ffffff" },
+        { id: "t4", label: "30 days", subtitle: "CAPA closed", fill: "#16a34a", textColor: "#ffffff" },
+      ],
+      orientation: "vertical",
       width: 180,
-      height: 120,
-      style: {
-        ...defaultBlockStyle,
-        fill: "#fef9c3",
-        stroke: "#ca8a04",
-        textColor: "#713f12",
-      },
+      stroke: "#cbd5e1",
+      milestoneFill: "#ffffff",
+      textColor: "#0f172a",
+    },
+  },
+  // Group 1: Safety Impact Assessment
+  {
+    id: "group_safety",
+    type: "group",
+    position: { x: 100, y: 120 },
+    data: {
+      title: "Safety Impact Assessment",
+      children: ["severity", "safety_team"],
+      width: 480,
+      height: 200,
+      fill: "#fefce8",
+      stroke: "#ca8a04",
+      strokeStyle: "dashed",
+      textColor: "#713f12",
+      collapsible: true,
+      collapsed: false,
+    },
+  },
+  // Operations node
+  {
+    id: "report",
+    type: "diagramBlock",
+    position: { x: 140, y: 320 },
+    data: {
+      label: "Incident Reporting",
+      subtitle: "Site Team",
+      icon: "📢",
+      shape: "terminator",
+      width: 180,
+      height: 60,
+      style: { ...defaultBlockStyle, fill: "#dcfce7", stroke: "#16a34a", textColor: "#14532d" },
+      badge: { text: "Immediate", fill: "#16a34a", textColor: "#ffffff" },
+      ownership: { owner: "Site Team", department: "Operations" },
     },
   },
   {
-    id: "end",
+    id: "site_team",
     type: "diagramBlock",
-    position: { x: 380, y: 380 },
+    position: { x: 360, y: 320 },
     data: {
-      label: "End",
-      shape: "terminator",
+      label: "Site Team",
+      subtitle: "First responder",
+      icon: "👷",
+      shape: "rectangle",
       width: 160,
-      height: 60,
-      style: {
-        ...defaultBlockStyle,
-        fill: "#fee2e2",
-        stroke: "#dc2626",
-        textColor: "#7f1d1d",
-      },
+      height: 70,
+      style: { ...defaultBlockStyle, fill: "#dbeafe", stroke: "#2563eb", textColor: "#1e3a8a" },
+      badge: { text: "15 Min", fill: "#dc2626", textColor: "#ffffff" },
+      ownership: { owner: "Site Lead", department: "Operations" },
+    },
+  },
+  // Decision node with criteria
+  {
+    id: "severity",
+    type: "diagramBlock",
+    position: { x: 170, y: 150 },
+    data: {
+      label: "Severity Assessment",
+      shape: "diamond",
+      width: 220,
+      height: 140,
+      style: { ...defaultBlockStyle, fill: "#fef9c3", stroke: "#ca8a04", textColor: "#713f12" },
+      criteria: ["Fire", "Signage Collapse", "Theft", "Water Ingress", "Pest Infestation"],
+      ownership: { owner: "Safety Team", approver: "Safety Head" },
+    },
+  },
+  {
+    id: "safety_team",
+    type: "diagramBlock",
+    position: { x: 410, y: 170 },
+    data: {
+      label: "Safety Team",
+      subtitle: "Functional escalation",
+      icon: "🛡️",
+      shape: "rectangle",
+      width: 150,
+      height: 80,
+      style: { ...defaultBlockStyle, fill: "#fee2e2", stroke: "#dc2626", textColor: "#7f1d1d" },
+      badge: { text: "30 Min", fill: "#dc2626", textColor: "#ffffff" },
+      ownership: { owner: "Safety Officer", approver: "HOD Safety" },
+    },
+  },
+  // Leadership
+  {
+    id: "hod",
+    type: "diagramBlock",
+    position: { x: 720, y: 150 },
+    data: {
+      label: "HOD",
+      subtitle: "Department Head",
+      icon: "👔",
+      shape: "rectangle",
+      width: 150,
+      height: 70,
+      style: { ...defaultBlockStyle, fill: "#f3e8ff", stroke: "#9333ea", textColor: "#581c87" },
+      badge: { text: "2 Hrs", fill: "#9333ea", textColor: "#ffffff" },
+      ownership: { owner: "HOD", approver: "P&L Head", reviewer: "Safety Committee" },
+    },
+  },
+  {
+    id: "pl_head",
+    type: "diagramBlock",
+    position: { x: 920, y: 150 },
+    data: {
+      label: "P&L Head",
+      subtitle: "Functional Head",
+      icon: "📊",
+      shape: "rectangle",
+      width: 150,
+      height: 70,
+      style: { ...defaultBlockStyle, fill: "#fce7f3", stroke: "#db2777", textColor: "#831843" },
+      badge: { text: "4 Hrs", fill: "#db2777", textColor: "#ffffff" },
+      ownership: { owner: "P&L Head", approver: "CEO", reviewer: "Board" },
+    },
+  },
+  // Annotation
+  {
+    id: "annotation1",
+    type: "annotation",
+    position: { x: 700, y: 60 },
+    data: {
+      text: "Emergency Response & Functional Escalation",
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#7c2d12",
+      align: "center",
+      italic: false,
+      width: 360,
+    },
+  },
+  // Brace
+  {
+    id: "brace1",
+    type: "brace",
+    position: { x: 1100, y: 140 },
+    data: {
+      orientation: "vertical",
+      length: 240,
+      label: "Leadership Escalation",
+      stroke: "#9333ea",
+      strokeWidth: 2,
+      labelColor: "#581c87",
+      fontSize: 12,
     },
   },
 ];
@@ -128,34 +263,160 @@ const starterNodes: DiagramNode[] = [
 const starterEdges: DiagramEdge[] = [
   {
     id: "e1",
-    source: "start",
-    target: "process",
-    type: "smoothstep",
-    data: { style: { ...defaultEdgeStyle } },
+    source: "report",
+    target: "site_team",
+    type: "orthogonal",
+    data: { style: { ...defaultEdgeStyle, type: "orthogonal" } },
   },
   {
     id: "e2",
-    source: "process",
-    target: "decision",
-    type: "smoothstep",
-    data: { style: { ...defaultEdgeStyle } },
+    source: "site_team",
+    target: "severity",
+    type: "orthogonal",
+    data: { style: { ...defaultEdgeStyle, type: "orthogonal" } },
   },
   {
     id: "e3",
-    source: "decision",
-    target: "end",
-    type: "smoothstep",
-    data: { style: { ...defaultEdgeStyle, label: "yes" } },
+    source: "severity",
+    target: "safety_team",
+    type: "orthogonal",
+    data: { style: { ...defaultEdgeStyle, type: "orthogonal", label: "Critical" } },
+  },
+  {
+    id: "e4",
+    source: "safety_team",
+    target: "hod",
+    type: "orthogonal",
+    data: { style: { ...defaultEdgeStyle, type: "orthogonal" } },
+  },
+  {
+    id: "e5",
+    source: "hod",
+    target: "pl_head",
+    type: "orthogonal",
+    data: { style: { ...defaultEdgeStyle, type: "orthogonal" } },
   },
 ];
 
 const initialProject: DiagramProject = {
-  name: "Untitled Diagram",
-  version: "1.0.0",
+  name: "Critical Safety Incident Escalation",
+  version: "2.0.0",
   canvas: defaultCanvas,
   nodes: starterNodes,
   edges: starterEdges,
 };
+
+// ============ Factory: create new node of any type ============
+
+function createNode(
+  type: NodeType,
+  position: { x: number; y: number },
+  label?: string
+): DiagramNode {
+  const id = `node_${uuidv4().slice(0, 8)}`;
+  const pos = position ?? { x: 200 + Math.random() * 200, y: 200 + Math.random() * 200 };
+
+  switch (type) {
+    case "group":
+      return {
+        id,
+        type: "group",
+        position: pos,
+        data: {
+          title: label ?? "New Group",
+          children: [],
+          width: 360,
+          height: 220,
+          fill: "#fefce8",
+          stroke: "#ca8a04",
+          strokeStyle: "dashed",
+          textColor: "#713f12",
+          collapsible: true,
+          collapsed: false,
+        },
+      };
+    case "annotation":
+      return {
+        id,
+        type: "annotation",
+        position: pos,
+        data: {
+          text: label ?? "New annotation",
+          fontSize: 13,
+          fontWeight: 600,
+          color: "#475569",
+          align: "left",
+          italic: false,
+          width: 240,
+        },
+      };
+    case "brace":
+      return {
+        id,
+        type: "brace",
+        position: pos,
+        data: {
+          orientation: "vertical",
+          length: 200,
+          label: label ?? "Phase",
+          stroke: "#475569",
+          strokeWidth: 2,
+          labelColor: "#0f172a",
+          fontSize: 12,
+        },
+      };
+    case "swimlane":
+      return {
+        id,
+        type: "swimlane",
+        position: pos,
+        data: {
+          title: label ?? "Swimlane",
+          lanes: [
+            { id: "lane1", label: "Lane 1", fill: "#eff6ff", textColor: "#1e3a8a" },
+            { id: "lane2", label: "Lane 2", fill: "#fef9c3", textColor: "#713f12" },
+            { id: "lane3", label: "Lane 3", fill: "#fee2e2", textColor: "#7f1d1d" },
+          ],
+          width: 600,
+          laneHeight: 160,
+          fill: "#ffffff",
+          stroke: "#cbd5e1",
+          textColor: "#0f172a",
+          assignments: {},
+        },
+      };
+    case "timeline":
+      return {
+        id,
+        type: "timeline",
+        position: pos,
+        data: {
+          title: label ?? "Timeline",
+          milestones: [
+            { id: "m1", label: "Start", fill: "#16a34a", textColor: "#ffffff" },
+            { id: "m2", label: "Mid", fill: "#ca8a04", textColor: "#ffffff" },
+            { id: "m3", label: "End", fill: "#dc2626", textColor: "#ffffff" },
+          ],
+          orientation: "vertical",
+          width: 160,
+          stroke: "#cbd5e1",
+          milestoneFill: "#ffffff",
+          textColor: "#0f172a",
+        },
+      };
+    case "diagramBlock":
+    default: {
+      const data: BlockData = {
+        label: label ?? "New Block",
+        shape: "rectangle",
+        width: 180,
+        height: 80,
+        style: { ...defaultBlockStyle },
+      };
+      return { id, type: "diagramBlock", position: pos, data };
+    }
+  }
+}
 
 export const useDiagramStore = create<DiagramState>((set, get) => ({
   project: initialProject,
@@ -171,36 +432,30 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
     }));
   },
 
-  addNode: (shape = "rectangle", position, label) => {
+  addNode: (type = "diagramBlock", position, label) => {
     get().pushHistory();
-    const id = `node_${uuidv4().slice(0, 8)}`;
-    const newNode: DiagramNode = {
-      id,
-      type: "diagramBlock",
-      position: position ?? { x: 240 + Math.random() * 80, y: 240 + Math.random() * 80 },
-      data: {
-        label: label ?? "New Block",
-        shape,
-        width: 180,
-        height: 80,
-        style: { ...defaultBlockStyle },
-      },
-    };
+    const newNode = createNode(type, position ?? { x: 240 + Math.random() * 80, y: 240 + Math.random() * 80 }, label);
     set((s) => ({
       project: { ...s.project, nodes: [...s.project.nodes, newNode] },
-      selectedNodeId: id,
+      selectedNodeId: newNode.id,
       selectedEdgeId: null,
     }));
-    return id;
+    return newNode.id;
   },
 
   updateNodeData: (id, partial) => {
     set((s) => ({
       project: {
         ...s.project,
-        nodes: s.project.nodes.map((n) =>
-          n.id === id ? { ...n, data: { ...n.data, ...partial, style: { ...n.data.style, ...(partial.style ?? {}) } } } : n
-        ),
+        nodes: s.project.nodes.map((n) => {
+          if (n.id !== id) return n;
+          if (n.type === "diagramBlock") {
+            const newData = { ...n.data, ...partial } as any;
+            if (partial.style) newData.style = { ...n.data.style, ...partial.style };
+            return { ...n, data: newData };
+          }
+          return { ...n, data: { ...n.data, ...partial } as any };
+        }),
       },
     }));
   },
@@ -235,8 +490,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       ...node,
       id: newId,
       position: { x: node.position.x + 40, y: node.position.y + 40 },
-      data: { ...node.data },
-    };
+      data: { ...node.data } as any,
+    } as DiagramNode;
     set((s) => ({
       project: { ...s.project, nodes: [...s.project.nodes, newNode] },
       selectedNodeId: newId,
@@ -251,8 +506,8 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       id,
       source,
       target,
-      type: "smoothstep",
-      data: { style: { ...defaultEdgeStyle, ...style } },
+      type: "orthogonal",
+      data: { style: { ...defaultEdgeStyle, type: "orthogonal", ...style } },
     };
     set((s) => ({
       project: { ...s.project, edges: [...s.project.edges, newEdge] },
@@ -332,6 +587,31 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       history: [...s.history, project],
       selectedNodeId: null,
       selectedEdgeId: null,
+    }));
+  },
+
+  toggleGroupCollapse: (id) => {
+    set((s) => ({
+      project: {
+        ...s.project,
+        nodes: s.project.nodes.map((n) => {
+          if (n.id !== id || n.type !== "group") return n;
+          return { ...n, data: { ...n.data, collapsed: !n.data.collapsed } };
+        }),
+      },
+    }));
+  },
+
+  assignNodeToLane: (nodeId, laneId) => {
+    set((s) => ({
+      project: {
+        ...s.project,
+        nodes: s.project.nodes.map((n) => {
+          if (n.type !== "swimlane") return n;
+          const assignments = { ...(n.data.assignments ?? {}), [nodeId]: laneId };
+          return { ...n, data: { ...n.data, assignments } };
+        }),
+      },
     }));
   },
 }));

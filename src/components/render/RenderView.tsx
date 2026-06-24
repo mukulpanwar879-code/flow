@@ -10,6 +10,8 @@ import { Upload, FileJson, ImageIcon, Code2, Eye, Download, Trash2, Sparkles } f
 import { toast } from "sonner";
 import { DiagramProject, DiagramNode, DiagramEdge } from "@/types/diagram";
 import { getShapePath, shadowFilter } from "@/lib/diagram/shapes";
+import { normalizeProject, validateProject, looksLikeProject } from "@/lib/diagram/normalize";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const SAMPLE: DiagramProject = {
   name: "Sample Pipeline",
@@ -149,22 +151,37 @@ export function RenderView() {
 
   const handleRender = () => {
     try {
-      const parsed = JSON.parse(text) as DiagramProject;
-      if (!parsed.nodes || !parsed.edges || !parsed.canvas) {
-        throw new Error("Missing required fields: nodes, edges, or canvas");
+      const trimmed = text.trim();
+      if (!trimmed) {
+        setError("No JSON to render. Paste or upload a diagram first.");
+        toast.error("No JSON to render.");
+        return;
       }
-      // basic validation
-      const ids = new Set(parsed.nodes.map((n) => n.id));
-      parsed.edges.forEach((e) => {
-        if (!ids.has(e.source)) throw new Error(`Edge ${e.id} references unknown source: ${e.source}`);
-        if (!ids.has(e.target)) throw new Error(`Edge ${e.id} references unknown target: ${e.target}`);
-      });
-      setProject(parsed);
+      const parsed = JSON.parse(trimmed);
+
+      // Validate first — show helpful errors if the structure is wrong
+      const issues = validateProject(parsed);
+      if (issues.length > 0) {
+        const msg = issues[0];
+        setError(msg);
+        toast.error(`Invalid JSON: ${msg}`);
+        return;
+      }
+      if (!looksLikeProject(parsed)) {
+        setError("JSON must be an object with `nodes` and `edges` arrays.");
+        toast.error("Invalid JSON structure.");
+        return;
+      }
+
+      // Normalize so missing fields are filled with defaults — never crashes
+      const project = normalizeProject(parsed);
+      setProject(project);
       setError(null);
-      toast.success(`Rendered ${parsed.nodes.length} blocks and ${parsed.edges.length} lines`);
+      toast.success(`Rendered ${project.nodes.length} blocks and ${project.edges.length} lines`);
     } catch (e) {
-      setError((e as Error).message);
-      toast.error(`Invalid JSON: ${(e as Error).message}`);
+      const msg = (e as Error).message || "Invalid JSON syntax.";
+      setError(msg);
+      toast.error(`Invalid JSON: ${msg}`);
     }
   };
 
@@ -175,17 +192,30 @@ export function RenderView() {
     reader.onload = () => {
       const t = reader.result as string;
       setText(t);
-      // auto-render on upload
       try {
-        const parsed = JSON.parse(t) as DiagramProject;
-        setProject(parsed);
+        const parsed = JSON.parse(t);
+        const issues = validateProject(parsed);
+        if (issues.length > 0) {
+          setError(issues[0]);
+          toast.error(`Invalid file: ${issues[0]}`);
+          return;
+        }
+        const project = normalizeProject(parsed);
+        setProject(project);
         setError(null);
         toast.success(`Loaded ${file.name}`);
       } catch (err) {
-        setError((err as Error).message);
+        setError((err as Error).message || "Could not parse file as JSON.");
+        toast.error(`Invalid JSON file: ${(err as Error).message}`);
       }
     };
+    reader.onerror = () => {
+      setError("Could not read the file.");
+      toast.error("Could not read the file.");
+    };
     reader.readAsText(file);
+    // Reset the input so the same file can be re-uploaded
+    e.target.value = "";
   };
 
   const loadSample = () => {
@@ -269,7 +299,24 @@ export function RenderView() {
               </div>
             </div>
           ) : (
-            <RenderedDiagram project={project} />
+            <ErrorBoundary
+              fallback={(err, reset) => (
+                <div className="h-full flex items-center justify-center">
+                  <div className="max-w-md text-center space-y-3">
+                    <ImageIcon className="h-10 w-10 text-destructive mx-auto opacity-60" />
+                    <h3 className="text-sm font-semibold">Couldn&apos;t render this diagram</h3>
+                    <p className="text-xs text-muted-foreground break-words">
+                      {err.message}
+                    </p>
+                    <Button size="sm" variant="outline" onClick={reset}>
+                      Try again
+                    </Button>
+                  </div>
+                </div>
+              )}
+            >
+              <RenderedDiagram project={project} />
+            </ErrorBoundary>
           )}
         </div>
       </div>
@@ -279,73 +326,100 @@ export function RenderView() {
 
 function ExportButtons({ project }: { project: DiagramProject }) {
   const downloadSVG = () => {
-    const svg = generateSVG(project);
-    const blob = new Blob([svg], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("SVG downloaded");
+    try {
+      const svg = generateSVG(project);
+      const blob = new Blob([svg], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(project.name || "diagram").replace(/[^a-z0-9]/gi, "_").toLowerCase()}.svg`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("SVG downloaded");
+    } catch (e) {
+      toast.error(`SVG export failed: ${(e as Error).message}`);
+    }
   };
 
   const downloadHTML = () => {
-    const html = generateHTML(project);
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("HTML downloaded");
+    try {
+      const html = generateHTML(project);
+      const blob = new Blob([html], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(project.name || "diagram").replace(/[^a-z0-9]/gi, "_").toLowerCase()}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("HTML downloaded");
+    } catch (e) {
+      toast.error(`HTML export failed: ${(e as Error).message}`);
+    }
   };
 
   const downloadPNG = async () => {
-    const svg = generateSVG(project);
-    const img = new Image();
-    const svgBlob = new Blob([svg], { type: "image/svg+xml" });
-    const url = URL.createObjectURL(svgBlob);
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const scale = 2; // 2x for crispness
-      canvas.width = project.canvas.width * scale;
-      canvas.height = project.canvas.height * scale;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.scale(scale, scale);
-      ctx.fillStyle = project.canvas.background;
-      ctx.fillRect(0, 0, project.canvas.width, project.canvas.height);
-      ctx.drawImage(img, 0, 0);
-      URL.revokeObjectURL(url);
-      canvas.toBlob((blob) => {
-        if (!blob) return;
-        const pngUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = pngUrl;
-        a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.png`;
-        a.click();
-        URL.revokeObjectURL(pngUrl);
-        toast.success("PNG downloaded");
-      });
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      toast.error("PNG export failed - try SVG instead");
-    };
-    img.src = url;
+    try {
+      const svg = generateSVG(project);
+      const img = new Image();
+      const svgBlob = new Blob([svg], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(svgBlob);
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const scale = 2; // 2x for crispness
+          canvas.width = project.canvas.width * scale;
+          canvas.height = project.canvas.height * scale;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            toast.error("Could not get canvas context.");
+            return;
+          }
+          ctx.scale(scale, scale);
+          ctx.fillStyle = project.canvas.background;
+          ctx.fillRect(0, 0, project.canvas.width, project.canvas.height);
+          ctx.drawImage(img, 0, 0);
+          URL.revokeObjectURL(url);
+          canvas.toBlob((blob) => {
+            if (!blob) {
+              toast.error("PNG export produced no data.");
+              return;
+            }
+            const pngUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = pngUrl;
+            a.download = `${(project.name || "diagram").replace(/[^a-z0-9]/gi, "_").toLowerCase()}.png`;
+            a.click();
+            URL.revokeObjectURL(pngUrl);
+            toast.success("PNG downloaded");
+          });
+        } catch (e) {
+          URL.revokeObjectURL(url);
+          toast.error(`PNG export failed: ${(e as Error).message}`);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        toast.error("PNG export failed - try SVG instead");
+      };
+      img.src = url;
+    } catch (e) {
+      toast.error(`PNG export failed: ${(e as Error).message}`);
+    }
   };
 
   const downloadJSON = () => {
-    const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${project.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("JSON downloaded");
+    try {
+      const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(project.name || "diagram").replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("JSON downloaded");
+    } catch (e) {
+      toast.error(`JSON export failed: ${(e as Error).message}`);
+    }
   };
 
   return (
@@ -399,20 +473,48 @@ function generateSVG(project: DiagramProject): string {
   const nodeMap = new Map<string, DiagramNode>();
   nodes.forEach((n) => nodeMap.set(n.id, n));
 
+  // Defensive: each node/edge renders in its own try/catch so one bad entry
+  // can never crash the entire SVG output.
   const edgePaths = edges
-    .map((e) => renderEdgeSVG(e, nodeMap))
+    .map((e) => {
+      try {
+        return renderEdgeSVG(e, nodeMap);
+      } catch (err) {
+        console.warn("[renderEdgeSVG] skipping edge", e?.id, err);
+        return "";
+      }
+    })
     .join("\n      ");
 
   const nodeShapes = nodes
-    .map((n) => renderNodeSVG(n))
+    .map((n) => {
+      try {
+        return renderNodeSVG(n);
+      } catch (err) {
+        console.warn("[renderNodeSVG] skipping node", n?.id, err);
+        return "";
+      }
+    })
     .join("\n      ");
 
+  const width = canvas?.width ?? 800;
+  const height = canvas?.height ?? 600;
+  const bg = canvas?.background ?? "#ffffff";
+
   return `<svg xmlns="http://www.w3.org/2000/svg"
-       width="${canvas.width}"
-       height="${canvas.height}"
-       viewBox="0 0 ${canvas.width} ${canvas.height}"
+       width="${width}"
+       height="${height}"
+       viewBox="0 0 ${width} ${height}"
        font-family="Inter, system-ui, sans-serif">
-  <rect width="100%" height="100%" fill="${canvas.background}" />
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+    </marker>
+    <marker id="arrowclosed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="${bg}" />
   <g>
       ${edgePaths}
   </g>

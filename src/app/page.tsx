@@ -16,9 +16,9 @@ export default function Home() {
   const projectName = useDiagramStore((s) => s.project.name);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30">
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30 flex-shrink-0">
         <div className="flex items-center justify-between px-4 h-14">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
@@ -61,22 +61,10 @@ export default function Home() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1 min-h-0">
-        {view === "builder" && (
-          <div className="h-[calc(100vh-3.5rem)]">
-            <BuilderView />
-          </div>
-        )}
-        {view === "docs" && (
-          <div className="h-[calc(100vh-3.5rem)]">
-            <DocsView />
-          </div>
-        )}
-        {view === "render" && (
-          <div className="h-[calc(100vh-3.5rem)]">
-            <RenderView />
-          </div>
-        )}
+      <main className="flex-1 min-h-0 overflow-hidden">
+        {view === "builder" && <BuilderView />}
+        {view === "docs" && <DocsView />}
+        {view === "render" && <RenderView />}
       </main>
     </div>
   );

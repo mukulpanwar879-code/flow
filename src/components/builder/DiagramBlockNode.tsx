@@ -1,7 +1,7 @@
 "use client";
 
-import { memo } from "react";
-import { Handle, Position, NodeProps, NodeResizer } from "@xyflow/react";
+import { memo, useCallback } from "react";
+import { Handle, Position, NodeProps, NodeResizer, type NodeResizeHandler } from "@xyflow/react";
 import { getShapePath, getBracePath, shadowFilter } from "@/lib/diagram/shapes";
 import { BlockData } from "@/types/diagram";
 import { useDiagramStore } from "@/store/diagram-store";
@@ -24,10 +24,22 @@ export interface DiagramBlockNodeData {
   [key: string]: unknown;
 }
 
-function DiagramBlockNodeImpl({ data, selected }: NodeProps) {
+function DiagramBlockNodeImpl({ data, selected, id }: NodeProps) {
   const d = data as DiagramBlockNodeData;
   const { width, height, style, shape, label, subtitle, icon, badge, ownership, criteria } = d;
   const path = getShapePath(shape, width, height);
+  const updateNodeData = useDiagramStore((s) => s.updateNodeData);
+
+  // Sync resize drags back to the store so width/height persist
+  const onResize: NodeResizeHandler = useCallback(
+    (_, params) => {
+      updateNodeData(id, {
+        width: Math.max(40, params.width),
+        height: Math.max(30, params.height),
+      });
+    },
+    [id, updateNodeData]
+  );
 
   const badgePos = badge?.position ?? "top-right";
   const badgeStyle: React.CSSProperties = (() => {
@@ -51,6 +63,15 @@ function DiagramBlockNodeImpl({ data, selected }: NodeProps) {
 
   return (
     <div className="relative" style={{ width, height, filter: shadowFilter(style.shadow) }}>
+      {/* Resize handles — visible only when selected */}
+      <NodeResizer
+        isVisible={selected}
+        minWidth={40}
+        minHeight={30}
+        onResize={onResize}
+        lineClassName="!border-blue-500"
+        handleClassName="!w-2.5 !h-2.5 !bg-blue-500 !border !border-white !rounded-sm"
+      />
       <svg width={width} height={height} className="absolute inset-0" style={{ overflow: "visible" }}>
         <path
           d={path}
@@ -127,7 +148,18 @@ export interface GroupNodeData {
 function GroupNodeImpl({ data, selected, id }: NodeProps) {
   const d = data as GroupNodeData;
   const toggleCollapse = useDiagramStore((s) => s.toggleGroupCollapse);
+  const updateNodeData = useDiagramStore((s) => s.updateNodeData);
   const dashArray = d.strokeStyle === "dashed" ? "8 4" : d.strokeStyle === "dotted" ? "2 4" : undefined;
+
+  const onResize: NodeResizeHandler = useCallback(
+    (_, params) => {
+      updateNodeData(id, {
+        width: Math.max(120, params.width),
+        height: Math.max(80, params.height),
+      });
+    },
+    [id, updateNodeData]
+  );
 
   return (
     <div
@@ -147,6 +179,7 @@ function GroupNodeImpl({ data, selected, id }: NodeProps) {
         minWidth={120}
         minHeight={d.collapsed ? 36 : 80}
         isVisible={selected}
+        onResize={onResize}
         lineClassName="!border-blue-500"
         handleClassName="!w-2 !h-2 !bg-blue-500 !border !border-white"
       />
@@ -274,10 +307,23 @@ export interface SwimlaneNodeData {
   [key: string]: unknown;
 }
 
-function SwimlaneNodeImpl({ data, selected }: NodeProps) {
+function SwimlaneNodeImpl({ data, selected, id }: NodeProps) {
   const d = data as SwimlaneNodeData;
+  const updateNodeData = useDiagramStore((s) => s.updateNodeData);
   const labelWidth = 120;
   const totalHeight = d.lanes.length * d.laneHeight + 36;
+
+  const onResize: NodeResizeHandler = useCallback(
+    (_, params) => {
+      // Swimlane height = lanes * laneHeight + header; back-calculate laneHeight
+      const newLaneHeight = Math.max(80, Math.round((params.height - 36) / Math.max(1, d.lanes.length)));
+      updateNodeData(id, {
+        width: Math.max(300, params.width - labelWidth),
+        laneHeight: newLaneHeight,
+      });
+    },
+    [id, updateNodeData, d.lanes.length]
+  );
 
   return (
     <div
@@ -290,6 +336,14 @@ function SwimlaneNodeImpl({ data, selected }: NodeProps) {
         borderRadius: 6,
       }}
     >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={300 + labelWidth}
+        minHeight={36 + 80 * Math.max(1, d.lanes.length)}
+        onResize={onResize}
+        lineClassName="!border-blue-500"
+        handleClassName="!w-2 !h-2 !bg-blue-500 !border !border-white"
+      />
       {/* Title bar */}
       <div
         className="px-3 py-1.5 text-xs font-bold uppercase tracking-wide border-b"
@@ -340,11 +394,19 @@ export interface TimelineNodeData {
   [key: string]: unknown;
 }
 
-function TimelineNodeImpl({ data, selected }: NodeProps) {
+function TimelineNodeImpl({ data, selected, id }: NodeProps) {
   const d = data as TimelineNodeData;
+  const updateNodeData = useDiagramStore((s) => s.updateNodeData);
   const isVertical = d.orientation === "vertical";
   const milestoneSize = 36;
   const gap = isVertical ? 56 : 80;
+
+  const onResize: NodeResizeHandler = useCallback(
+    (_, params) => {
+      updateNodeData(id, { width: Math.max(120, params.width) });
+    },
+    [id, updateNodeData]
+  );
 
   return (
     <div
@@ -355,6 +417,14 @@ function TimelineNodeImpl({ data, selected }: NodeProps) {
         border: selected ? "1px dashed #2563eb" : "1px dashed transparent",
       }}
     >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={120}
+        minHeight={60}
+        onResize={onResize}
+        lineClassName="!border-blue-500"
+        handleClassName="!w-2 !h-2 !bg-blue-500 !border !border-white"
+      />
       {d.title && (
         <div className="text-xs font-bold uppercase tracking-wide mb-2 px-2" style={{ color: d.textColor }}>
           {d.title}

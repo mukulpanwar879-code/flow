@@ -3,7 +3,6 @@
 import { useDiagramStore } from "@/store/diagram-store";
 import { blockShapeOptions, nodeTypeOptions, BlockShape, NodeType } from "@/types/diagram";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { getShapePath, getBracePath } from "@/lib/diagram/shapes";
 import { Plus, Trash2, Copy, Undo2, Redo2, FileJson, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,13 +37,13 @@ export function BlockPalette({ onImportClick, onExportClick }: BlockPaletteProps
   };
 
   return (
-    <Card className="h-full flex flex-col p-0 overflow-hidden border-r">
-      <div className="px-4 py-3 border-b">
+    <Card className="h-full flex flex-col p-0 overflow-hidden border-r rounded-none">
+      <div className="px-4 py-3 border-b flex-shrink-0">
         <h3 className="text-sm font-semibold">Elements</h3>
         <p className="text-xs text-muted-foreground mt-0.5">Click to add to canvas</p>
       </div>
 
-      <div className="px-2 py-2 border-b flex flex-wrap gap-1">
+      <div className="px-2 py-2 border-b flex flex-wrap gap-1 flex-shrink-0">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -89,7 +88,7 @@ export function BlockPalette({ onImportClick, onExportClick }: BlockPaletteProps
         </TooltipProvider>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {/* Enterprise node types */}
         <div className="p-3">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
@@ -200,7 +199,7 @@ export function BlockPalette({ onImportClick, onExportClick }: BlockPaletteProps
             </Button>
           </div>
         </div>
-      </ScrollArea>
+      </div>
     </Card>
   );
 }

@@ -17,7 +17,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   blockShapeOptions,
   edgeTypeOptions,
@@ -51,8 +50,8 @@ export function InspectorPanel() {
   const activeTab = selectedNode ? "node" : selectedEdge ? "edge" : "project";
 
   return (
-    <Card className="h-full flex flex-col p-0 overflow-hidden border-l">
-      <div className="px-4 py-3 border-b">
+    <Card className="h-full flex flex-col p-0 overflow-hidden border-l rounded-none">
+      <div className="px-4 py-3 border-b flex-shrink-0">
         <div className="flex items-center gap-2">
           <Settings2 className="h-4 w-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Inspector</h3>
@@ -64,7 +63,7 @@ export function InspectorPanel() {
         </div>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-4">
           <Tabs defaultValue={activeTab} key={activeTab}>
             <TabsList className="grid w-full grid-cols-3 mb-3">
@@ -247,7 +246,7 @@ export function InspectorPanel() {
             </TabsContent>
           </Tabs>
         </div>
-      </ScrollArea>
+      </div>
     </Card>
   );
 }

@@ -705,7 +705,7 @@ function renderGroupSVG(n: DiagramNode): string {
       fill="${fill ?? "#fefce8"}" fill-opacity="0.6"
       stroke="${stroke ?? "#ca8a04"}" stroke-width="2" ${dash} />
     <text x="${x + 12}" y="${y + 18}" fill="${textColor ?? "#713f12"}" font-size="11" font-weight="700"
-      font-family="Inter, sans-serif">${collapsed ? "►" : "▼"} ${escapeXml(title || "Group").toUpperCase()}</text>
+      font-family="Inter, sans-serif">${collapsed ? "►" : "▼"} ${escapeXml((title || "Group").toUpperCase())}</text>
     ${subtitle ? `<text x="${x + 12}" y="${y + 30}" fill="${textColor ?? "#713f12"}" opacity="0.7" font-size="9" font-family="Inter, sans-serif">${escapeXml(subtitle)}</text>` : ""}
   </g>`;
 }

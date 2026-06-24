@@ -76,13 +76,11 @@ function CanvasInner() {
         data: n.data as any,
         selected: n.id === selectedNodeId,
       };
-      // Don't set explicit width/height for non-block nodes so RF uses intrinsic size
-      if (n.type === "diagramBlock") {
-        (base as any).width = (n.data as any).width;
-        (base as any).height = (n.data as any).height;
-      }
-      // Groups/swimlanes shouldn't be draggable by default (use header to drag),
-      // but we'll leave them draggable for now and just set proper z-index via order.
+      // Set explicit width/height so NodeResizer has known starting dimensions
+      // and so React Flow doesn't auto-measure (which would fight the store).
+      const data: any = n.data;
+      if (data?.width != null) (base as any).width = data.width;
+      if (data?.height != null) (base as any).height = data.height;
       return base;
     });
   }, [project.nodes, selectedNodeId]);
